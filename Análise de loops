@@ -1,0 +1,110 @@
+REPORT ZINTERNAL_TABLE_OPERATIONS.* Program to find the best method in reading the internal tables
+* Author: Suresh Kumar Parvathaneni* Type declaration
+TYPES:
+  BEGIN OF TY_MARA,
+    MATNR LIKE MARA-MATNR,
+    MTART LIKE MARA-MTART,
+  END OF TY_MARA.* Internal table declaration
+DATA:
+  T_MARA TYPE STANDARD TABLE OF TY_MARA,
+  T_MARA1 TYPE SORTED TABLE OF TY_MARA
+          WITH NON-UNIQUE KEY MTART.* Variable declaration
+DATA:
+  W_COUNTER TYPE I,
+  W_RUNTIME1 TYPE I,
+  W_RUNTIME2 TYPE I,
+  W_TABIX LIKE SY-TABIX.* Table workarea definition
+DATA:
+  WA_MARA TYPE TY_MARA.SELECT MATNR                           " Material Number
+       MTART                           " Material Type
+  FROM MARA
+  INTO TABLE T_MARA.T_MARA1[] = T_MARA[].* CASE 1: Processing internal table using LOOP..WHERE ConditionGET RUN TIME FIELD W_RUNTIME1.LOOP AT T_MARA INTO WA_MARA WHERE MTART EQ 'FHMI'.
+  ADD 1 TO W_COUNTER.
+ENDLOOP.GET RUN TIME FIELD W_RUNTIME2.
+* Calculate Runtime
+W_RUNTIME2 = W_RUNTIME2 - W_RUNTIME1.
+WRITE W_RUNTIME2.CLEAR W_COUNTER.* CASE 2: Using a Sorted tableGET RUN TIME FIELD W_RUNTIME1.
+LOOP AT T_MARA1 INTO WA_MARA WHERE MTART EQ 'FHMI'.
+  ADD 1 TO W_COUNTER.
+ENDLOOP.GET RUN TIME FIELD W_RUNTIME2.
+* Calculate Runtime
+W_RUNTIME2 = W_RUNTIME2 - W_RUNTIME1.
+WRITE W_RUNTIME2.CLEAR W_COUNTER.* CASE 3: Using INDEX on a sorted tableGET RUN TIME FIELD W_RUNTIME1.
+READ TABLE T_MARA1 INTO WA_MARA WITH KEY MTART = 'FHMI'.
+IF SY-SUBRC EQ 0.
+  W_TABIX = SY-TABIX + 1.
+  ADD 1 TO W_COUNTER.
+  LOOP AT T_MARA1 INTO WA_MARA FROM W_TABIX.
+    IF WA_MARA-MTART NE 'FHMI'.
+      EXIT.
+    ENDIF.
+    ADD 1 TO W_COUNTER.
+  ENDLOOP.
+ENDIF.
+GET RUN TIME FIELD W_RUNTIME2.
+* Calculate Runtime
+W_RUNTIME2 = W_RUNTIME2 - W_RUNTIME1.
+WRITE W_RUNTIME2.Following is the analysis report in microseconds, as per the data volume:   
+
+Records: 21,390 
+
+Iteration No 
+ Using Normal LOOP & WHERE 
+ Using Sorted table LOOP & WHERE 
+ Using INDEX on Sorted table 
+ 
+1 
+ 897 
+ 887 
+ 11 
+ 
+2 
+ 839 
+ 879 
+ 10 
+ 
+3 
+ 839 
+ 877 
+ 10 
+ 
+4 
+ 834 
+ 880 
+ 9 
+ 
+5 
+ 842 
+ 837 
+ 10 
+ 
+
+Records: 132,693 
+
+Iteration No 
+ Using Normal LOOP & WHERE 
+ Using Sorted table LOOP & WHERE 
+ Using INDEX on Sorted table 
+ 
+1 
+ 34239  
+ 35774  
+ 3567 
+ 
+2 
+ 34271  
+ 38250  
+ 3592 
+ 
+3 
+ 34492  
+ 36534  
+ 3554 
+ 
+4 
+ 34198  
+ 35695  
+ 3584 
+ 
+
+Sorted table might have given a better performance here if the field in the WHERE condition is the first field in the internal table. However, from the above statistics, we can say that method 3 is better than the other 2 methods. In production environment, the data would be huge and the performance could be much improved with this simple technique. 
